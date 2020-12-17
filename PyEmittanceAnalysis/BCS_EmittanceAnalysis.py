@@ -17,9 +17,12 @@ from matplotlib import rc_context
 rc('xtick.major', pad=10)
 from matplotlib import rcdefaults
 from matplotlib.colors import LinearSegmentedColormap
-# from types import *
-from dans_pymodules import *
-# from DansPyMods import *
+# # from types import *
+# from dans_pymodules import *
+# # from DansPyMods import *
+from mpl_canvas_wrapper import MPLCanvasWrapper
+from filedialog_gtk import FileDialog
+from particles import IonSpecies
 import os
 import sys
 
