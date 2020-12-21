@@ -13,6 +13,7 @@ from matplotlib import colors as mplcol
 from matplotlib import cm
 from matplotlib import rc
 from matplotlib import rc_context
+from copy import deepcopy as dcp
 
 rc('xtick.major', pad=10)
 from matplotlib import rcdefaults
@@ -24,7 +25,7 @@ from particles import IonSpecies
 import os
 import sys
 
-saveExe = False
+usetex = True  # (formerly saveExe)
 
 # --- Constants -------------------------------------------------------------- #
 pi = 3.14159265358979323  # Pi
@@ -34,9 +35,15 @@ echarge = 1.602176462e-19  # Proton charge (C)
 emass = 9.10938188e-31  # Electron mass (kg)
 eps_0 = 8.854187817620e-12  # vacuum permittivity (F/m)
 largepos = 1.0e36  # Very large positive number
-
-
 # ---------------------------------------------------------------------------- #
+
+if usetex:
+    rc('xtick.major', pad=10)
+    rc('text', usetex=True)
+    rc('font', **{'family': 'serif', 'serif': ['Computer Modern Roman'], 'weight': 100, 'size': 20})
+    rc('ytick', labelsize=20)
+    rc('xtick', labelsize=20)
+    rc('savefig', dpi=300)
 
 
 class MyColors(object):
@@ -345,9 +352,7 @@ class BCSEmittanceAnalysis(object):
                     "voltage": np.array([], 'd'),
                     "current": np.array([], 'd')}
 
-        data = {"raw_data": raw_data}
-
-        return data
+        return {"raw_data": raw_data}
 
     def get_connections(self, widget):
         """
@@ -397,9 +402,7 @@ class BCSEmittanceAnalysis(object):
         return 0
 
     def about(self, widget):
-        print("No About Dialog implemented. GitHub Repo:" \
-              "https://github.com/DanielWinklehner/PyEmittanceAnalysis")
-
+        print("About dialog not implemented.")
         return 0
 
     def open_file(self, widget):
@@ -501,7 +504,8 @@ class BCSEmittanceAnalysis(object):
             self.status.push(1, mymsg)
             return 1
 
-        outFileNameImg = os.path.splitext(outFileName)[0] + ".pdf"
+        outFileNameImg1 = os.path.splitext(outFileName)[0] + ".png"
+        outFileNameImg2 = os.path.splitext(outFileName)[0] + ".pdf"
         outFileNameDat = os.path.splitext(outFileName)[0] + ".dat"
 
         # --- Save text file --- "
@@ -512,21 +516,15 @@ class BCSEmittanceAnalysis(object):
                                                          self.outputTextBuffer.get_end_iter(), False))
 
         # --- Save Image file --- #
-        if not saveExe:
+        # if not saveExe:
+        self.mainPlot.figure.savefig(outFileNameImg1, format='png')
+        self.mainPlot.figure.savefig(outFileNameImg2, format='pdf')
 
-            with rc_context(rc={'text.usetex': True,
-                                'font.family': 'serif',
-                                'font.serif': 'Computer Modern Roman',
-                                'font.weight': 150,
-                                'font.size': 18}):
+        # else:
+        #
+        #     self.mainPlot.figure.savefig(outFileNameImg1, format='png')
 
-                self.mainPlot.figure.savefig(outFileNameImg, format='pdf', bbox_inches='tight', dpi=150)
-
-        else:
-
-            self.mainPlot.figure.savefig(outFileNameImg, format='png', bbox_inches='tight', dpi=150)
-
-        outFileNameImg = os.path.split(outFileNameImg)[1]
+        outFileNameImg = os.path.split(outFileNameImg1)[1]
         outFileNameDat = os.path.split(outFileNameDat)[1]
 
         mymsg = "Files saved as %s and %s" % (outFileNameImg, outFileNameDat)
@@ -545,7 +543,6 @@ class BCSEmittanceAnalysis(object):
     def update_gui(self, widget, parameter1=None):
         """
         """
-
         plotSettings = self.mainPlot.get_settings()
         self.mainPlot.clear()
         self.temp_roi = None
@@ -556,16 +553,17 @@ class BCSEmittanceAnalysis(object):
             return 1
 
         # --- Get some values from GUI and self.data --- #
-        raw_data = self.data["raw_data"]
-        plateVoltages = raw_data["voltage"]
-        xPos = raw_data["position"]
-        currents = raw_data["current"]
+        plateVoltages = dcp(self.data["raw_data"]["voltage"])
+        xPos = dcp(self.data["raw_data"]["position"])
+        currents = dcp(self.data["raw_data"]["current"])
 
         sourceHV = int(self.wtree.get_object("hv_sb").get_value())
         mass = float(self.wtree.get_object("mass_sb").get_value())
         chargeState = int(self.wtree.get_object("chargestate_sb").get_value())
         clipNegative = self.wtree.get_object("clip_negative_cb").get_active()
         threshold = float(self.wtree.get_object("threshold_sb").get_value())
+
+        # print("Called Update. We should clip negative: {}".format(clipNegative))
 
         # --- Determine scan mode and adjust labels --- #
         if self.wtree.get_object("horz_rb").get_active():
@@ -626,6 +624,7 @@ class BCSEmittanceAnalysis(object):
 
         # --- Apply threshold to currents --- #
         if clipNegative:
+
             currents[np.where(currents < 0.0)] = 0.0
 
         # --- Arranging into numpy sorted array and sorting by 'x' --- #
@@ -659,6 +658,8 @@ class BCSEmittanceAnalysis(object):
         # --- Total Current --- #
         totalCurrent = np.sum(data["currents"])
 
+        # print("Called Update. Total current = {}".format(totalCurrent))
+
         info += "\nTotal current in scan: %.4e uA\n" % (totalCurrent * 1.0e6)
 
         # --- Means --- #
@@ -679,86 +680,99 @@ class BCSEmittanceAnalysis(object):
         info += "2RMS beam diameter: %.4f mm\n" % (4.0 * np.sqrt(xRmsSq))
 
         # --- Emittances --- #
-        emittanceRms = np.sqrt(xRmsSq * xpRmsSq - xXpRmsSq * xXpRmsSq)
-        emittanceRmsNorm = beta * gamma * emittanceRms
-        emittance4Rms = 4.0 * emittanceRms
-        emittance4RmsNorm = beta * gamma * emittance4Rms
+        insq = xRmsSq * xpRmsSq - xXpRmsSq * xXpRmsSq
 
-        info += "\nEmittances:\n"
-        info += "-----------\n"
-        info += "RMS emittance: %.5f pi-mm-mrad \n" % emittanceRms
-        info += "4RMS emittance: %.5f pi-mm-mrad\n" % emittance4Rms
-        info += "Normalized RMS emittance: %.5f pi-mm-mrad \n" % emittanceRmsNorm
-        info += "Normalized 4RMS emittance: %.5f pi-mm-mrad\n" % emittance4RmsNorm
+        if insq > 0:
 
-        # --- Twiss parameters --- #
-        twissBeta = xRmsSq / emittanceRms
-        twissGamma = xpRmsSq / emittanceRms
+            emittanceRms = np.sqrt(xRmsSq * xpRmsSq - xXpRmsSq * xXpRmsSq)
+            emittanceRmsNorm = beta * gamma * emittanceRms
+            emittance4Rms = 4.0 * emittanceRms
+            emittance4RmsNorm = beta * gamma * emittance4Rms
 
-        # Define the sign of twissAlpha
-        checkXp = np.sum(data["currents"] * (data["x"] - xMean) * (data["xp"] - xpMean))
+            info += "\nEmittances:\n"
+            info += "-----------\n"
+            info += "RMS emittance: %.5f pi-mm-mrad \n" % emittanceRms
+            info += "4RMS emittance: %.5f pi-mm-mrad\n" % emittance4Rms
+            info += "Normalized RMS emittance: %.5f pi-mm-mrad \n" % emittanceRmsNorm
+            info += "Normalized 4RMS emittance: %.5f pi-mm-mrad\n" % emittance4RmsNorm
 
-        if checkXp < 0:
+            # --- Twiss parameters --- #
+            twissBeta = xRmsSq / emittanceRms
+            twissGamma = xpRmsSq / emittanceRms
 
-            twissAlpha = np.sqrt(twissBeta * twissGamma - 1.0)  # convergent beam
+            # Define the sign of twissAlpha
+            checkXp = np.sum(data["currents"] * (data["x"] - xMean) * (data["xp"] - xpMean))
+
+            if checkXp < 0:
+
+                twissAlpha = np.sqrt(twissBeta * twissGamma - 1.0)  # convergent beam
+
+            else:
+
+                twissAlpha = -np.sqrt(twissBeta * twissGamma - 1.0)  # divergent beam
+
+            # --- Angle of rotation of beam ellipse in phase space from Twiss parameters --- #
+            phiEllipse = 0.5 * np.arctan2(-2.0 * twissAlpha, twissGamma - twissBeta) * 180.0 / pi + 90.0
+
+            # --- Generate beam ellipses for plot --- #
+            hTemp = 0.5 * (twissBeta + twissGamma)
+
+            # 4RMS
+            rootHalfEmittance = np.sqrt(0.5 * emittance4Rms)
+
+            R1 = rootHalfEmittance * (np.sqrt(hTemp + 1) + np.sqrt(hTemp - 1))
+            R2 = rootHalfEmittance * (np.sqrt(hTemp + 1) - np.sqrt(hTemp - 1))
+
+            ellipse4Rms = Ellipse([xMean, xpMean], 2.0 * R1, 2.0 * R2, angle=-phiEllipse,
+                                  fill=False,
+                                  edgecolor=self.colors[2],
+                                  linestyle="dashed",
+                                  linewidth=2.0)
+
+            # 1RMS
+            rootHalfEmittance = np.sqrt(0.5 * emittanceRms)
+
+            R1 = rootHalfEmittance * (np.sqrt(hTemp + 1) + np.sqrt(hTemp - 1))
+            R2 = rootHalfEmittance * (np.sqrt(hTemp + 1) - np.sqrt(hTemp - 1))
+
+            ellipse1Rms = Ellipse([xMean, xpMean], 2.0 * R1, 2.0 * R2, angle=-phiEllipse,
+                                  fill=False,
+                                  edgecolor=self.colors[3],
+                                  linestyle="dashed",
+                                  linewidth=1.5)
+
+            # --- Calculate percent of beam inside 4 RMS emittance --- #
+            current1Rms = 0
+            current4Rms = 0
+
+            for xTemp, xpTemp, currentTemp in data:
+
+                if ellipse1Rms.contains_point([xTemp, xpTemp]):
+                    current1Rms += currentTemp
+
+                if ellipse4Rms.contains_point([xTemp, xpTemp]):
+                    current4Rms += currentTemp
+
+            emittance1RmsPercent = 100.0 * current1Rms / totalCurrent  # percent
+            emittance4RmsPercent = 100.0 * current4Rms / totalCurrent  # percent
+
+            info += "\n1RMS emittance includes %.1f %% of the beam\n" % emittance1RmsPercent
+            info += "4RMS emittance includes %.1f %% of the beam\n" % emittance4RmsPercent
+
+            info += "\n1RMS Twiss parameters:\n"
+            info += "----------------------\n"
+            info += "Alpha = %.4e        \n" % twissAlpha
+            info += "Beta = %.4e mm/mrad \n" % twissBeta
+            info += "Gamma = %.4e mrad/mm\n" % twissGamma
+
+            # --- Plotting --- #
+            if self.wtree.get_object("ellipses_cb").get_active():
+                self.mainPlot.axis.add_artist(ellipse1Rms)
+                self.mainPlot.axis.add_artist(ellipse4Rms)
 
         else:
-
-            twissAlpha = -np.sqrt(twissBeta * twissGamma - 1.0)  # divergent beam
-
-        # --- Angle of rotation of beam ellipse in phase space from Twiss parameters --- #
-        phiEllipse = 0.5 * np.arctan2(-2.0 * twissAlpha, twissGamma - twissBeta) * 180.0 / pi + 90.0
-
-        # --- Generate beam ellipses for plot --- #
-        hTemp = 0.5 * (twissBeta + twissGamma)
-
-        # 4RMS
-        rootHalfEmittance = np.sqrt(0.5 * emittance4Rms)
-
-        R1 = rootHalfEmittance * (np.sqrt(hTemp + 1) + np.sqrt(hTemp - 1))
-        R2 = rootHalfEmittance * (np.sqrt(hTemp + 1) - np.sqrt(hTemp - 1))
-
-        ellipse4Rms = Ellipse([xMean, xpMean], 2.0 * R1, 2.0 * R2, angle=-phiEllipse,
-                              fill=False,
-                              edgecolor=self.colors[2],
-                              linestyle="dashed",
-                              linewidth=2.0)
-
-        # 1RMS
-        rootHalfEmittance = np.sqrt(0.5 * emittanceRms)
-
-        R1 = rootHalfEmittance * (np.sqrt(hTemp + 1) + np.sqrt(hTemp - 1))
-        R2 = rootHalfEmittance * (np.sqrt(hTemp + 1) - np.sqrt(hTemp - 1))
-
-        ellipse1Rms = Ellipse([xMean, xpMean], 2.0 * R1, 2.0 * R2, angle=-phiEllipse,
-                              fill=False,
-                              edgecolor=self.colors[3],
-                              linestyle="dashed",
-                              linewidth=1.5)
-
-        # --- Calculate percent of beam inside 4 RMS emittance --- #
-        current1Rms = 0
-        current4Rms = 0
-
-        for xTemp, xpTemp, currentTemp in data:
-
-            if ellipse1Rms.contains_point([xTemp, xpTemp]):
-                current1Rms += currentTemp
-
-            if ellipse4Rms.contains_point([xTemp, xpTemp]):
-                current4Rms += currentTemp
-
-        emittance1RmsPercent = 100.0 * current1Rms / totalCurrent  # percent
-        emittance4RmsPercent = 100.0 * current4Rms / totalCurrent  # percent
-
-        info += "\n1RMS emittance includes %.1f %% of the beam\n" % emittance1RmsPercent
-        info += "4RMS emittance includes %.1f %% of the beam\n" % emittance4RmsPercent
-
-        info += "\n1RMS Twiss parameters:\n"
-        info += "----------------------\n"
-        info += "Alpha = %.4e        \n" % twissAlpha
-        info += "Beta = %.4e mm/mrad \n" % twissBeta
-        info += "Gamma = %.4e mrad/mm\n" % twissGamma
+            info += "\nSomething went wrong during emittance calculation.\n"
+            info += "Try clipping negative currents."
 
         # --- Interpolation --- #
         grid_x, grid_xp = np.mgrid[xmin:xmax:200j, xpmin:xpmax:200j]
@@ -766,11 +780,6 @@ class BCSEmittanceAnalysis(object):
 
         # --- Thresholding the interpolated data --- #
         sscn_img[np.where(sscn_img < threshold)] = threshold
-
-        # --- Plotting --- #
-        if self.wtree.get_object("ellipses_cb").get_active():
-            self.mainPlot.axis.add_artist(ellipse1Rms)
-            self.mainPlot.axis.add_artist(ellipse4Rms)
 
         if logarithmicScale:
             norm = LogNorm()
@@ -818,8 +827,8 @@ class BCSEmittanceAnalysis(object):
 
         self.mainPlot.cb = self.mainPlot.figure.colorbar(img, ticks=ticks, format=r"%.1f nA")
         self.mainPlot.cb.ax.tick_params(labelsize=16)
-        self.mainPlot.cb.set_clim(vmin=vmin, vmax=vmax)
-        # img.set_clim(vmin=vmin, vmax=vmax)
+        # self.mainPlot.cb.set_clim(vmin=vmin, vmax=vmax)
+        img.set_clim(vmin=vmin, vmax=vmax)
         self.mainPlot.cb.set_ticks(ticks)
         self.mainPlot.cb.update_normal(img)
         self.mainPlot.reset_secondary_axes()
@@ -911,7 +920,8 @@ class BCSEmittanceAnalysis(object):
         self.mainPlot = MPLCanvasWrapper(self.window, 0)
         self.wtree.get_object("plot_alignment").add(self.mainPlot)
         # self.mainPlot.set_aspect("equal")
-        self.mainPlot.set_title("Phase Space")
+        # self.mainPlot.set_title("Phase Space")
+        self.mainPlot.set_title("")
         self.mainPlot.set_xlabel("x (mm)")
         self.mainPlot.set_ylabel("x' (mrad)")
         self.mainPlot.connect("button-press-event", self.buttonPress)

@@ -33,11 +33,11 @@ def generate_default_settings():
                "y2_max": float(1)}
 
     adjustments = {"major_ticks": 15,
-                   "label_fs": 30,
+                   "label_fs": 20,
                    "legend_ms": 1,
                    "legend_fs": 18,
                    "legend_lw": 1,
-                   "title_fs": 30,
+                   "title_fs": 20,
                    "line_width": 1,
                    "marker_size": 25
                    }
@@ -162,11 +162,11 @@ class SettingsDialog(object):
 
         # --- Fill in the entries and spinboxes with the current values --- #
         for key in old_settings["entry"].keys():
-            
+
             self.builder.get_object(key + "_entry").set_text(str(old_settings["entry"][key]))
 
         for key in old_settings["adj"].keys():
-            
+
             self.builder.get_object(key + "_adj").set_value(old_settings["adj"][key])
 
         # --- Make a VBox for the legend entries --- #
@@ -1297,7 +1297,8 @@ class MPLCanvasWrapper(Gtk.VBox):
 
         self._main_window = main_window
 
-        self.figure = Figure(facecolor='#474747', edgecolor='#474747')
+        self.figure = Figure()
+        # self.figure = Figure(facecolor='#474747', edgecolor='#474747')
         self.canvas = FigureCanvasGTK3Agg(self.figure)  # a Gtk.DrawingArea
 
         # --- Flag for primary axis time format
