@@ -562,8 +562,9 @@ class BCSEmittanceAnalysis(object):
         chargeState = int(self.wtree.get_object("chargestate_sb").get_value())
         clipNegative = self.wtree.get_object("clip_negative_cb").get_active()
         threshold = float(self.wtree.get_object("threshold_sb").get_value())
+        shift_centroid = self.wtree.get_object("shift_centroid_cb").get_active()
 
-        # print("Called Update. We should clip negative: {}".format(clipNegative))
+        print("Called Update. We should shift centroid: {}".format(shift_centroid))
 
         # --- Determine scan mode and adjust labels --- #
         if self.wtree.get_object("horz_rb").get_active():
@@ -649,12 +650,6 @@ class BCSEmittanceAnalysis(object):
 
         points = np.array([data['x'], data['xp']]).T
 
-        # --- Limits --- #
-        xmin = min(points[:, 0])
-        xmax = max(points[:, 0])
-        xpmin = min(points[:, 1])
-        xpmax = max(points[:, 1])
-
         # --- Total Current --- #
         totalCurrent = np.sum(data["currents"])
 
@@ -666,10 +661,24 @@ class BCSEmittanceAnalysis(object):
         xMean = np.sum(data["currents"] * data["x"]) / totalCurrent
         xpMean = np.sum(data["currents"] * data["xp"]) / totalCurrent
 
-        info += "\nGeometric Information:\n"
+        info += "\nGeometric Information (before shifting):\n"
         info += "----------------------\n"
         info += "Mean position: %.4f mm \n" % xMean
         info += "Mean angle: %.4f mrad  \n" % xpMean
+
+        if shift_centroid:
+            points[:, 0] -= xMean
+            points[:, 1] -= xpMean
+            data["x"] -= xMean
+            data["xp"] -= xpMean
+            xMean = 0.0
+            xpMean = 0.0
+            
+        # --- Limits --- #
+        xmin = min(points[:, 0])
+        xmax = max(points[:, 0])
+        xpmin = min(points[:, 1])
+        xpmax = max(points[:, 1])
 
         # --- RMS values --- #
         xRmsSq = np.sum(data["currents"] * (data["x"] - xMean) * (data["x"] - xMean)) / totalCurrent
@@ -874,7 +883,7 @@ class BCSEmittanceAnalysis(object):
         self.ROIS = []
         self.temp_roi = None
         # --- Set up the glade file (GUI) and connect signal handlers --- #
-        self.gladefile = "GUI_v3.glade"
+        self.gladefile = "GUI_v4.glade"
         self.wtree = Gtk.Builder()
         self.wtree.add_from_file(self.gladefile)
 
