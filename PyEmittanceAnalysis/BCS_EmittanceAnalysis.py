@@ -34,8 +34,6 @@ echarge = 1.602176462e-19  # Proton charge (C)
 emass = 9.10938188e-31  # Electron mass (kg)
 eps_0 = 8.854187817620e-12  # vacuum permittivity (F/m)
 largepos = 1.0e36  # Very large positive number
-
-
 # ---------------------------------------------------------------------------- #
 
 
