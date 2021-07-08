@@ -298,7 +298,7 @@ class Polygon2D:
         return len(self.poly)
 
 
-class BCSEmittanceAnalysis(object):
+class PyEmittanceAnalysis(object):
     """
     """
 
@@ -636,6 +636,9 @@ class BCSEmittanceAnalysis(object):
         data = np.array(_data, dtype=dtype)
         data = np.sort(data, order='x')
 
+        # --- Apply position scaling (to account for possible calibration error) --- #
+        data["x"] *= float(self.wtree.get_object("pos_scaling_entry").get_text())
+
         # --- Remove points in user defined ROI's --- #
         counter = 0
 
@@ -673,7 +676,7 @@ class BCSEmittanceAnalysis(object):
             data["xp"] -= xpMean
             xMean = 0.0
             xpMean = 0.0
-            
+
         # --- Limits --- #
         xmin = min(points[:, 0])
         xmax = max(points[:, 0])
@@ -883,7 +886,7 @@ class BCSEmittanceAnalysis(object):
         self.ROIS = []
         self.temp_roi = None
         # --- Set up the glade file (GUI) and connect signal handlers --- #
-        self.gladefile = "GUI_v4.glade"
+        self.gladefile = "GUI_v5.glade"
         self.wtree = Gtk.Builder()
         self.wtree.add_from_file(self.gladefile)
 
@@ -943,5 +946,5 @@ class BCSEmittanceAnalysis(object):
 
 
 if __name__ == "__main__":
-    AESGUI = BCSEmittanceAnalysis()
+    AESGUI = PyEmittanceAnalysis()
     Gtk.main()
