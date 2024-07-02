@@ -22,6 +22,13 @@ and the following packages using ``pip install``:
 * scipy
 * matplotlib
 
+Note: As X server I use XLaunch and click the "Disable Access Control" checkbox.
+
+Post-2024: It may be necessary to install icons and cursors for Gtk/Gdk 3.0:
+```buildoutcfg
+sudo apt-get -y install adwaita-icon-theme
+```
+
 You should be good to go.
 
 # Some notes about the program:
